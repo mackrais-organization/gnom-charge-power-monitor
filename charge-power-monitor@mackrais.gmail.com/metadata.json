@@ -1,10 +1,9 @@
 {
   "uuid": "charge-power-monitor@mackrais.gmail.com",
   "name": "Charge Power Monitor",
-  "description": "Shows current battery charge or discharge power in watts in the GNOME top panel using Linux power_supply telemetry.",
+  "description": "Shows laptop battery charge or discharge power in watts and supported peripheral battery levels in the GNOME top panel menu.",
   "shell-version": [
     "42"
   ],
   "url": "https://github.com/mackrais-organization/gnom-charge-power-monitor"
 }
-

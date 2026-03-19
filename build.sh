@@ -8,6 +8,9 @@ ZIP_PATH="$DIST_DIR/$UUID.shell-extension.zip"
 
 mkdir -p "$DIST_DIR"
 rm -f "$ZIP_PATH"
-gnome-extensions pack "$ROOT_DIR/$UUID" --out-dir "$DIST_DIR"
+(
+  cd "$ROOT_DIR/$UUID"
+  zip -qr "$ZIP_PATH" .
+)
 
 printf 'Built: %s\n' "$ZIP_PATH"
