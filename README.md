@@ -3,7 +3,7 @@
 Author: `Oleh Boiko`  
 Contact: `developer@mackrais.com`
 
-GNOME Shell extension for Ubuntu 22.04.5 LTS / GNOME Shell 42.9.
+GNOME Shell extension for Ubuntu/Linux that shows laptop battery power in watts and supported peripheral battery levels in the top panel menu.
 
 It provides:
 
@@ -14,6 +14,14 @@ It provides:
 ## Screenshot Example
 
 ![Charge Power Monitor screenshot](screenshot/image.png)
+
+## Compatibility
+
+Declared `shell-version` support:
+
+- `42`
+- `43`
+- `44`
 
 ## Data Sources
 
@@ -59,6 +67,12 @@ Use the provided installer:
 ./install.sh
 ```
 
+Reinstall and print status, detected UPower devices, and recent GNOME Shell log lines:
+
+```bash
+./reinstall.sh
+```
+
 Manual install:
 
 ```bash
@@ -85,9 +99,27 @@ To generate the zip for `extensions.gnome.org`:
 ./build.sh
 ```
 
+Before build, the repository runs a local pre-review check:
+
+```bash
+./review-check.sh
+```
+
+`build.sh` stops on local `error`-level review issues.  
+`install.sh` and `reinstall.sh` run the same checks in warning-only mode.
+
 The output archive is:
 
 `dist/charge-power-monitor@mackrais.gmail.com.shell-extension.zip`
+
+The extension package includes:
+
+- `extension.js`
+- `metadata.json`
+- `icon.svg`
+- `icon-symbolic.svg`
+
+PNG exports are also available in the extension directory for website uploads or other project assets.
 
 ## Current machine
 

@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UUID="charge-power-monitor@mackrais.gmail.com"
 
+"$ROOT_DIR/review-check.sh" --warn-only || true
+printf '\n'
+
 "$ROOT_DIR/install.sh"
 
 gnome-extensions disable "$UUID" >/dev/null 2>&1 || true

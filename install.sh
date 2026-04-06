@@ -2,8 +2,12 @@
 set -euo pipefail
 
 UUID="charge-power-monitor@mackrais.gmail.com"
-SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$UUID"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SRC_DIR="$ROOT_DIR/$UUID"
 DST_DIR="$HOME/.local/share/gnome-shell/extensions/$UUID"
+
+"$ROOT_DIR/review-check.sh" --warn-only || true
+printf '\n'
 
 mkdir -p "$DST_DIR"
 cp -r "$SRC_DIR"/* "$DST_DIR"/

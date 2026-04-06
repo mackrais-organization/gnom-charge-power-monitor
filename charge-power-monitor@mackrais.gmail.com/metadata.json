@@ -3,7 +3,9 @@
   "name": "Charge Power Monitor",
   "description": "Shows laptop battery charge or discharge power in watts and supported peripheral battery levels in the GNOME top panel menu.",
   "shell-version": [
-    "42"
+    "42",
+    "43",
+    "44"
   ],
   "url": "https://github.com/mackrais-organization/gnom-charge-power-monitor"
 }

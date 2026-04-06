@@ -6,6 +6,8 @@ UUID="charge-power-monitor@mackrais.gmail.com"
 DIST_DIR="$ROOT_DIR/dist"
 ZIP_PATH="$DIST_DIR/$UUID.shell-extension.zip"
 
+"$ROOT_DIR/review-check.sh"
+
 mkdir -p "$DIST_DIR"
 rm -f "$ZIP_PATH"
 (
