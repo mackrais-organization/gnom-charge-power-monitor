@@ -28,6 +28,7 @@ const SUPPORTED_PERIPHERAL_TYPES = new Set([
     'joystick',
     'gaming-input',
 ]);
+const TEXT_DECODER = new TextDecoder();
 
 function execCommunicate(argv) {
     const proc = Gio.Subprocess.new(
@@ -54,17 +55,26 @@ function execCommunicate(argv) {
     });
 }
 
-function readTrimmedFile(path) {
+async function readTrimmedFile(path) {
     try {
-        const [, contents] = GLib.file_get_contents(path);
-        return imports.byteArray.toString(contents).trim();
+        const file = Gio.File.new_for_path(path);
+        const [, contents] = await new Promise((resolve, reject) => {
+            file.load_contents_async(null, (source, result) => {
+                try {
+                    resolve(source.load_contents_finish(result));
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        });
+        return TEXT_DECODER.decode(contents).trim();
     } catch (error) {
         return null;
     }
 }
 
-function readInteger(path) {
-    const value = readTrimmedFile(path);
+async function readInteger(path) {
+    const value = await readTrimmedFile(path);
     if (value === null)
         return null;
 
@@ -72,7 +82,7 @@ function readInteger(path) {
     return Number.isNaN(parsed) ? null : parsed;
 }
 
-function findBatteryPath() {
+async function findBatteryPath() {
     try {
         const directory = Gio.File.new_for_path(POWER_SUPPLY_PATH);
         const enumerator = directory.enumerate_children(
@@ -88,7 +98,7 @@ function findBatteryPath() {
 
             const name = info.get_name();
             const candidatePath = `${POWER_SUPPLY_PATH}/${name}`;
-            const type = readTrimmedFile(`${candidatePath}/type`);
+            const type = await readTrimmedFile(`${candidatePath}/type`);
 
             if (type === 'Battery')
                 return candidatePath;
@@ -100,8 +110,8 @@ function findBatteryPath() {
     return null;
 }
 
-function readPowerTelemetry() {
-    const batteryPath = findBatteryPath();
+async function readPowerTelemetry() {
+    const batteryPath = await findBatteryPath();
     if (batteryPath === null) {
         return {
             text: 'n/a',
@@ -109,16 +119,16 @@ function readPowerTelemetry() {
         };
     }
 
-    const status = readTrimmedFile(`${batteryPath}/status`) ?? 'Unknown';
-    const capacity = readInteger(`${batteryPath}/capacity`);
-    const powerMicroWatts = readInteger(`${batteryPath}/power_now`);
+    const status = await readTrimmedFile(`${batteryPath}/status`) ?? 'Unknown';
+    const capacity = await readInteger(`${batteryPath}/capacity`);
+    const powerMicroWatts = await readInteger(`${batteryPath}/power_now`);
 
     let watts = null;
     if (powerMicroWatts !== null) {
         watts = powerMicroWatts / 1e6;
     } else {
-        const voltageMicroVolts = readInteger(`${batteryPath}/voltage_now`);
-        const currentMicroAmps = readInteger(`${batteryPath}/current_now`);
+        const voltageMicroVolts = await readInteger(`${batteryPath}/voltage_now`);
+        const currentMicroAmps = await readInteger(`${batteryPath}/current_now`);
 
         if (voltageMicroVolts !== null && currentMicroAmps !== null)
             watts = (voltageMicroVolts * currentMicroAmps) / 1e12;
@@ -410,6 +420,7 @@ class Extension {
         this._deviceTimeoutId = null;
         this._isEnabled = false;
         this._deviceRefreshToken = 0;
+        this._telemetryRefreshToken = 0;
     }
 
     enable() {
@@ -464,6 +475,8 @@ class Extension {
             this._deviceTimeoutId = null;
         }
 
+        this._clearDeviceItems();
+
         if (this._indicator !== null) {
             this._indicator.destroy();
             this._indicator = null;
@@ -475,11 +488,17 @@ class Extension {
         this._deviceItems = [];
     }
 
-    _sync() {
+    async _sync() {
+        const refreshToken = ++this._telemetryRefreshToken;
+
         if (this._label === null || this._detailsItem === null)
             return;
 
-        const reading = readPowerTelemetry();
+        const reading = await readPowerTelemetry();
+
+        if (!this._isEnabled || refreshToken !== this._telemetryRefreshToken)
+            return;
+
         this._label.text = reading.text;
         this._detailsItem.label.text = reading.details;
     }
@@ -506,10 +525,7 @@ class Extension {
         if (this._devicesSection === null)
             return;
 
-        for (const item of this._deviceItems)
-            item.destroy();
-
-        this._deviceItems = [];
+        this._clearDeviceItems();
 
         const titleItem = new PopupMenu.PopupMenuItem('Peripheral batteries', {
             reactive: false,
@@ -536,6 +552,13 @@ class Extension {
             this._devicesSection.addMenuItem(item);
             this._deviceItems.push(item);
         }
+    }
+
+    _clearDeviceItems() {
+        for (const item of this._deviceItems)
+            item.destroy();
+
+        this._deviceItems = [];
     }
 }
 
