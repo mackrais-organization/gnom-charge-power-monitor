@@ -1,5 +1,9 @@
 # Charge Power Monitor
 
+[![CI](https://github.com/mackrais-organization/gnom-charge-power-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/mackrais-organization/gnom-charge-power-monitor/actions/workflows/ci.yml)
+[![Release](https://github.com/mackrais-organization/gnom-charge-power-monitor/actions/workflows/release.yml/badge.svg)](https://github.com/mackrais-organization/gnom-charge-power-monitor/actions/workflows/release.yml)
+[![License: GPL-2.0-or-later](https://img.shields.io/badge/License-GPL--2.0--or--later-blue.svg)](LICENSE)
+
 Author: `Oleh Boiko`  
 Contact: `developer@mackrais.com`
 
@@ -107,6 +111,28 @@ Before build, the repository runs a local pre-review check:
 
 `build.sh` stops on local `error`-level review issues.  
 `install.sh` and `reinstall.sh` run the same checks in warning-only mode.
+
+## CI/CD
+
+GitHub Actions workflows are included for a production-style repository setup:
+
+- `CI` runs local review checks, `gjs` syntax validation, `eslint`, and bundle build on push and pull request
+- `Release` builds the extension bundle and attaches the zip to a GitHub Release when a `v*` tag is pushed
+
+Local JavaScript tooling:
+
+```bash
+npm install
+npm run lint
+```
+
+## Project Files
+
+- `CONTRIBUTING.md` documents the contribution workflow
+- `CHANGELOG.md` tracks notable changes
+- `RELEASE.md` contains the release checklist
+- `.editorconfig` provides baseline formatting rules
+- `.github/dependabot.yml` keeps npm and GitHub Actions dependencies updated
 
 The output archive is:
 

@@ -1,0 +1,14 @@
+{
+  "name": "charge-power-monitor",
+  "private": true,
+  "version": "1.0.0",
+  "description": "GNOME Shell extension that shows laptop battery power in watts and supported peripheral battery levels.",
+  "scripts": {
+    "lint": "eslint charge-power-monitor@mackrais.gmail.com/extension.js",
+    "review": "./review-check.sh",
+    "build": "./build.sh"
+  },
+  "devDependencies": {
+    "eslint": "9.22.0"
+  }
+}

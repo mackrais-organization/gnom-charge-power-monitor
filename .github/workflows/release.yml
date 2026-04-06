@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build And Publish Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        run: npm install
+
+      - name: Install GNOME runtime tooling
+        run: sudo apt-get update && sudo apt-get install -y gjs ripgrep
+
+      - name: Run review checks
+        run: ./review-check.sh
+
+      - name: Run GJS syntax check
+        run: gjs -c "$(cat charge-power-monitor@mackrais.gmail.com/extension.js)"
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Build extension archive
+        run: ./build.sh
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/charge-power-monitor@mackrais.gmail.com.shell-extension.zip
+          generate_release_notes: true
