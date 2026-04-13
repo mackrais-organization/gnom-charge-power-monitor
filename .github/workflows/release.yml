@@ -41,7 +41,7 @@ jobs:
         run: ./build.sh
 
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/charge-power-monitor@mackrais.gmail.com.shell-extension.zip
           generate_release_notes: true
