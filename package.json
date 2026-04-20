@@ -9,6 +9,6 @@
     "build": "./build.sh"
   },
   "devDependencies": {
-    "eslint": "9.22.0"
+    "eslint": "10.2.1"
   }
 }
