@@ -6,6 +6,22 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+
+- `metadata-check.py`: validates `metadata.json` against extensions.gnome.org
+  rules (key set, `uuid`, `shell-version`, `version-name`, `session-modes`,
+  `donations`); run by `review-check.sh` and CI.
+- CI `Validate Package` job that packs the extension with the real
+  `gnome-extensions pack` tool.
+- Manual `workflow_dispatch` trigger for the `Release` workflow, and a check
+  that the release tag matches `metadata.json` `version-name`.
+
+### Changed
+
+- `eslint.config.js` now uses the GJS globals set and rejects `var`, loose
+  equality, and deprecated `imports.byteArray` / `imports.lang` /
+  `imports.mainloop`.
+
 ## [6] - 2026-09-09
 
 First git-tagged release. The number matches the extensions.gnome.org version

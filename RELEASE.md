@@ -5,31 +5,51 @@
 1. Run local checks:
    ```bash
    ./review-check.sh
+   python3 metadata-check.py
    npm install
    npm run lint
+   node --check charge-power-monitor@mackrais.gmail.com/extension.js
    ./build.sh
    ```
-2. Reinstall and verify the extension manually:
+2. Optional, matches the CI `Validate Package` job (needs `gnome-shell`
+   installed for the `gnome-extensions` CLI):
+   ```bash
+   gnome-extensions pack charge-power-monitor@mackrais.gmail.com \
+     --extra-source=icon.svg --extra-source=icon-symbolic.svg \
+     --extra-source=icon.png --extra-source=icon-symbolic.png \
+     --force --out-dir /tmp/pack
+   ```
+3. Reinstall and verify the extension manually:
    ```bash
    ./reinstall.sh
    ```
-3. Confirm:
+   Confirm:
    - panel indicator works
-   - dropdown renders correctly
+   - dropdown renders correctly, including the battery charge limit submenu
    - extension enables without GNOME Shell errors
-   - `dist/charge-power-monitor@mackrais.gmail.com.shell-extension.zip` is up to date
-4. Update documentation if behavior, compatibility, scripts, or packaging changed.
+4. Update documentation if behaviour, compatibility, scripts, or packaging changed.
 5. Update `CHANGELOG.md`.
-6. Bump `version-name` in `metadata.json` to match the tag / expected
-   extensions.gnome.org version. Leave `version` unset (the website assigns it).
+6. Bump `version-name` in `metadata.json`. The release tag **must** be
+   `v<version-name>` (the `Release` workflow fails otherwise). Leave `version`
+   unset - extensions.gnome.org assigns it.
 
 ## Create Release
 
-1. Commit the release changes.
-2. Create and push a tag:
+The change lands on `master` through a pull request (see `CONTRIBUTING.md`).
+Once it is merged:
+
+1. Tag and push:
    ```bash
-   git tag vX.Y.Z
-   git push origin vX.Y.Z
+   git tag -a vN -m "vN"
+   git push origin vN
    ```
-3. Wait for the GitHub `Release` workflow to publish the release artifact.
-4. Upload the generated zip to `extensions.gnome.org` if needed.
+   (`N` is the `version-name`.) The `Release` workflow verifies the tag against
+   `metadata.json`, runs the checks, builds the bundle, and publishes a GitHub
+   release with the zip attached.
+
+   Alternatively, create the tag on GitHub and run the `Release` workflow
+   manually from the **Actions** tab (`workflow_dispatch`, input: the tag name).
+
+2. Upload the released zip to extensions.gnome.org (extension `9541`). The
+   website assigns its own incrementing `version`; keep `version-name` in step 6
+   aligned with it.
