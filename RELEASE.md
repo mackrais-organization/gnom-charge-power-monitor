@@ -20,6 +20,8 @@
    - `dist/charge-power-monitor@mackrais.gmail.com.shell-extension.zip` is up to date
 4. Update documentation if behavior, compatibility, scripts, or packaging changed.
 5. Update `CHANGELOG.md`.
+6. Bump `version-name` in `metadata.json` to match the tag / expected
+   extensions.gnome.org version. Leave `version` unset (the website assigns it).
 
 ## Create Release
 

@@ -31,6 +31,51 @@ const SUPPORTED_PERIPHERAL_TYPES = new Set([
 ]);
 const TEXT_DECODER = new TextDecoder();
 
+// The kernel exposes the charge limit under different names depending on the
+// battery driver. The first readable file in each list wins.
+const CHARGE_END_THRESHOLD_FILES = [
+    'charge_control_end_threshold',
+    'charge_stop_threshold',
+];
+const CHARGE_START_THRESHOLD_FILES = [
+    'charge_control_start_threshold',
+    'charge_start_threshold',
+];
+// Some drivers publish the exact values the embedded controller accepts.
+const CHARGE_END_OPTION_FILES = [
+    'charge_control_end_available_thresholds',
+];
+const CHARGE_START_OPTION_FILES = [
+    'charge_control_start_available_thresholds',
+];
+// When the driver also supports a start threshold, keep a gap below the end
+// value so the battery is not topped up again after every small drop.
+const CHARGE_START_GAP = 10;
+const CHARGE_START_MIN = 40;
+// Fallback list for drivers that do not publish an explicit set of values.
+const CHARGE_LIMIT_FALLBACK_VALUES = [100, 90, 80, 70, 60, 50];
+// Short guidance shown next to each selectable value.
+const CHARGE_LIMIT_HINTS = {
+    100: 'No limit · full runtime, most wear',
+    95: 'Almost no limit',
+    90: 'Light protection',
+    85: 'Light protection',
+    80: 'Recommended when mostly plugged in',
+    75: 'Longer battery life',
+    70: 'Longer battery life',
+    65: 'Long battery life',
+    60: 'Maximum battery life · always plugged in',
+    50: 'Storage level',
+    40: 'Storage level',
+};
+const CHARGE_LIMIT_INFO =
+    'Caps how full the battery charges. Staying below 100% reduces ' +
+    'lithium-ion wear from sitting at a full charge; above the cap the ' +
+    'laptop runs on AC power.\n' +
+    'A lower cap only takes effect once the battery drains below the resume ' +
+    'level - the controller does not discharge a battery that is already ' +
+    'fuller than the cap.';
+
 function execCommunicate(argv) {
     const proc = Gio.Subprocess.new(
         argv,
@@ -154,6 +199,120 @@ async function readPowerTelemetry() {
         text: `${prefix}${watts.toFixed(1)} W`,
         details: `${status} • ${capacityText}`,
     };
+}
+
+async function findExistingBatteryFile(batteryPath, candidates) {
+    for (const name of candidates) {
+        const value = await readTrimmedFile(`${batteryPath}/${name}`);
+        if (value !== null)
+            return `${batteryPath}/${name}`;
+    }
+
+    return null;
+}
+
+function parseThresholdOptions(raw) {
+    if (raw === null)
+        return null;
+
+    const values = raw
+        .split(/\s+/)
+        .map(token => Number.parseInt(token, 10))
+        .filter(value => !Number.isNaN(value) && value >= 0 && value <= 100);
+
+    if (values.length === 0)
+        return null;
+
+    const unique = Array.from(new Set(values)).sort((left, right) => left - right);
+    return unique;
+}
+
+async function readChargeLimitInfo() {
+    const unsupported = {
+        supported: false,
+        endPath: null,
+        startPath: null,
+        endThreshold: null,
+        startThreshold: null,
+        endOptions: null,
+        startOptions: null,
+        capacity: null,
+    };
+
+    const batteryPath = await findBatteryPath();
+    if (batteryPath === null)
+        return unsupported;
+
+    const endPath = await findExistingBatteryFile(batteryPath, CHARGE_END_THRESHOLD_FILES);
+    if (endPath === null)
+        return unsupported;
+
+    const startPath = await findExistingBatteryFile(batteryPath, CHARGE_START_THRESHOLD_FILES);
+    const endOptionPath = await findExistingBatteryFile(batteryPath, CHARGE_END_OPTION_FILES);
+    const startOptionPath = await findExistingBatteryFile(batteryPath, CHARGE_START_OPTION_FILES);
+
+    return {
+        supported: true,
+        endPath,
+        startPath,
+        endThreshold: await readInteger(endPath),
+        startThreshold: startPath === null ? null : await readInteger(startPath),
+        endOptions: endOptionPath === null
+            ? null
+            : parseThresholdOptions(await readTrimmedFile(endOptionPath)),
+        startOptions: startOptionPath === null
+            ? null
+            : parseThresholdOptions(await readTrimmedFile(startOptionPath)),
+        capacity: await readInteger(`${batteryPath}/capacity`),
+    };
+}
+
+// Build the list of end-threshold values offered in the menu. Prefer the exact
+// set the controller publishes; otherwise fall back to a sensible spread.
+function chargeLimitChoices(info) {
+    const options = info.endOptions;
+
+    if (options !== null && options.length >= 3)
+        return options.slice().reverse();
+
+    let values = CHARGE_LIMIT_FALLBACK_VALUES;
+    if (options !== null && options.length > 0) {
+        const min = options[0];
+        const max = options[options.length - 1];
+        values = values.filter(value => value >= min && value <= max);
+    }
+
+    return values;
+}
+
+// Choose a start threshold a little below the end value, snapped to a supported
+// value when the controller only accepts a fixed set.
+function pickStartThreshold(info, endValue) {
+    const target = Math.max(CHARGE_START_MIN, endValue - CHARGE_START_GAP);
+    const options = info.startOptions;
+
+    if (options === null || options.length === 0)
+        return target;
+
+    const belowTarget = options.filter(value => value <= target && value < endValue);
+    if (belowTarget.length > 0)
+        return belowTarget[belowTarget.length - 1];
+
+    const belowEnd = options.filter(value => value < endValue);
+    return belowEnd.length > 0 ? belowEnd[belowEnd.length - 1] : options[0];
+}
+
+function buildChargeLimitCommand(info, value) {
+    const statements = [];
+
+    // Write the start threshold first: some drivers reject an end value that is
+    // not strictly above the current start value.
+    if (info.startPath !== null)
+        statements.push(`echo ${pickStartThreshold(info, value)} > "${info.startPath}"`);
+
+    statements.push(`echo ${value} > "${info.endPath}"`);
+
+    return ['pkexec', '/bin/sh', '-c', statements.join(' && ')];
 }
 
 function getPropertyValue(line) {
@@ -417,11 +576,15 @@ class Extension {
         this._detailsItem = null;
         this._devicesSection = null;
         this._deviceItems = [];
+        this._chargeSection = null;
+        this._chargeLimitState = null;
+        this._chargeLimitBusy = false;
         this._timeoutId = null;
         this._deviceTimeoutId = null;
         this._isEnabled = false;
         this._deviceRefreshToken = 0;
         this._telemetryRefreshToken = 0;
+        this._chargeRefreshToken = 0;
     }
 
     enable() {
@@ -436,15 +599,19 @@ class Extension {
             can_focus: false,
         });
         this._devicesSection = new PopupMenu.PopupMenuSection();
+        this._chargeSection = new PopupMenu.PopupMenuSection();
 
         this._indicator.add_child(this._label);
         this._indicator.menu.addMenuItem(this._detailsItem);
         this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this._indicator.menu.addMenuItem(this._devicesSection);
+        this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        this._indicator.menu.addMenuItem(this._chargeSection);
         Main.panel.addToStatusArea('charge-power-monitor', this._indicator, 0, 'right');
 
         this._sync();
         this._refreshDevices();
+        this._refreshChargeLimit();
         this._timeoutId = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
             REFRESH_INTERVAL_SECONDS,
@@ -458,6 +625,7 @@ class Extension {
             DEVICE_REFRESH_INTERVAL_SECONDS,
             () => {
                 this._refreshDevices();
+                this._refreshChargeLimit();
                 return GLib.SOURCE_CONTINUE;
             }
         );
@@ -478,14 +646,33 @@ class Extension {
 
         this._clearDeviceItems();
 
+        if (this._chargeSection !== null) {
+            this._chargeSection.destroy();
+            this._chargeSection = null;
+        }
+
+        this._chargeLimitState = null;
+
+        if (this._devicesSection !== null) {
+            this._devicesSection.destroy();
+            this._devicesSection = null;
+        }
+
+        if (this._detailsItem !== null) {
+            this._detailsItem.destroy();
+            this._detailsItem = null;
+        }
+
+        if (this._label !== null) {
+            this._label.destroy();
+            this._label = null;
+        }
+
         if (this._indicator !== null) {
             this._indicator.destroy();
             this._indicator = null;
         }
 
-        this._label = null;
-        this._detailsItem = null;
-        this._devicesSection = null;
         this._deviceItems = [];
     }
 
@@ -560,6 +747,129 @@ class Extension {
             item.destroy();
 
         this._deviceItems = [];
+    }
+
+    async _refreshChargeLimit() {
+        const refreshToken = ++this._chargeRefreshToken;
+
+        if (this._chargeSection === null || this._chargeLimitBusy)
+            return;
+
+        let info;
+        try {
+            info = await readChargeLimitInfo();
+        } catch (error) {
+            return;
+        }
+
+        if (!this._isEnabled || refreshToken !== this._chargeRefreshToken)
+            return;
+        if (this._chargeSection === null)
+            return;
+
+        const signature = info.supported
+            ? `on:${info.endThreshold}:${info.startThreshold}:${info.capacity}`
+            : 'off';
+        if (this._chargeLimitState === signature)
+            return;
+
+        this._chargeLimitState = signature;
+        this._renderChargeLimit(info);
+    }
+
+    _renderChargeLimit(info) {
+        if (this._chargeSection === null)
+            return;
+
+        this._chargeSection.removeAll();
+
+        if (!info.supported) {
+            const unsupported = new PopupMenu.PopupMenuItem(
+                'Battery charge limit: not supported by this laptop',
+                { reactive: false, can_focus: false }
+            );
+            this._chargeSection.addMenuItem(unsupported);
+            return;
+        }
+
+        const title = info.endThreshold === null
+            ? 'Battery charge limit'
+            : `Battery charge limit — ${info.endThreshold}%`;
+        const submenu = new PopupMenu.PopupSubMenuMenuItem(title);
+        this._chargeSection.addMenuItem(submenu);
+
+        this._addChargeLimitText(submenu.menu, CHARGE_LIMIT_INFO);
+
+        const statusText = this._chargeLimitStatusText(info);
+        if (statusText !== null)
+            this._addChargeLimitText(submenu.menu, statusText);
+
+        submenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        for (const value of chargeLimitChoices(info)) {
+            const hint = CHARGE_LIMIT_HINTS[value];
+            const label = hint === undefined
+                ? `${value}%`
+                : `${value}%  ·  ${hint}`;
+            const item = new PopupMenu.PopupMenuItem(label);
+            if (value === info.endThreshold)
+                item.setOrnament(PopupMenu.Ornament.DOT);
+
+            item.connect('activate', () => {
+                this._applyChargeLimit(info, value);
+            });
+            submenu.menu.addMenuItem(item);
+        }
+    }
+
+    _addChargeLimitText(menu, text) {
+        const item = new PopupMenu.PopupMenuItem(text, {
+            reactive: false,
+            can_focus: false,
+        });
+        item.label.clutter_text.line_wrap = true;
+        item.label.style = 'max-width: 320px;';
+        menu.addMenuItem(item);
+    }
+
+    _chargeLimitStatusText(info) {
+        if (info.endThreshold === null)
+            return null;
+
+        const resumeAt = info.startThreshold ?? info.endThreshold;
+
+        if (info.capacity !== null && info.capacity > info.endThreshold) {
+            return `Battery is at ${info.capacity}%. The ${info.endThreshold}% ` +
+                `cap starts holding once it drops below ${resumeAt}%.`;
+        }
+
+        if (info.startThreshold !== null) {
+            return `Charging stops at ${info.endThreshold}% and resumes ` +
+                `below ${info.startThreshold}%.`;
+        }
+
+        return `Charging stops at ${info.endThreshold}%.`;
+    }
+
+    async _applyChargeLimit(info, value) {
+        if (this._chargeLimitBusy)
+            return;
+
+        this._chargeLimitBusy = true;
+
+        try {
+            // pkexec shows the system authentication dialog; writing the
+            // threshold needs root because the sysfs node is root-owned.
+            await execCommunicate(buildChargeLimitCommand(info, value));
+        } catch (error) {
+            // Authentication was dismissed or the write failed; the refresh
+            // below repaints the menu with the value the battery actually has.
+        } finally {
+            this._chargeLimitBusy = false;
+        }
+
+        this._chargeLimitState = null;
+        this._refreshChargeLimit();
     }
 }
 

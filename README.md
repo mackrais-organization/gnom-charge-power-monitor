@@ -15,6 +15,60 @@ It provides:
 - a top panel indicator with current laptop battery charge or discharge power in watts
 - a dropdown menu with laptop battery state and percentage
 - a dropdown section with supported peripheral battery levels when exposed by the system
+- a "Battery charge limit" control, shown only when the laptop supports it
+
+## Battery charge limit
+
+### Support check
+
+Many laptops (ThinkPad, some Clevo/Uniwill, ASUS, Huawei, TUXEDO, and others)
+let the kernel cap how full the battery charges. On enable, and every 30 s, the
+extension looks for a charge-threshold node on the battery:
+
+- `charge_control_end_threshold` (or the legacy `charge_stop_threshold`)
+- `charge_control_start_threshold` (or the legacy `charge_start_threshold`), when present
+- `charge_control_end_available_thresholds` / `charge_control_start_available_thresholds`,
+  when the driver publishes the exact values its controller accepts
+
+If no end-threshold node exists, the menu shows
+`Battery charge limit: not supported by this laptop` and nothing else changes.
+
+### Menu
+
+When a threshold is supported, the submenu shows the active value, the current
+stop/resume levels, and a list of values to pick from. When the driver publishes
+`charge_control_end_available_thresholds`, only those values are offered;
+otherwise the list is `100 / 90 / 80 / 70 / 60 / 50`.
+
+| Value | When it fits |
+| --- | --- |
+| `100%` | No limit. Use before travel when you need the full runtime. |
+| `90%` | Light protection with almost no capacity loss. |
+| `80%` | **Recommended** when the laptop is mostly plugged in. |
+| `70%` | Longer battery life; smaller reserve if power is lost. |
+| `60%` | Maximum battery life for an always-plugged desk setup. |
+| `50%` | Storage level. |
+
+Why cap it: a lithium-ion battery ages faster when it sits at a full charge,
+especially warm. Below the cap the laptop simply runs on AC power.
+
+### Behaviour and limits
+
+- A lower cap only starts holding once the battery drains **below the resume
+  level**. The embedded controller does not discharge a battery that is already
+  fuller than the cap, so on a laptop that stays plugged in the change is not
+  instant. To apply it now, run on battery until the charge drops under the
+  resume level, then plug back in.
+- Applying a value writes to a root-owned sysfs file, so the write goes through
+  `pkexec` and the system authentication dialog appears.
+- When a `start` threshold exists, it is set one step below the `end` value
+  (snapped to a supported value) so the battery is not topped up again after
+  every small drop.
+- The kernel does not persist thresholds across reboot on every driver. For a
+  value that always survives a restart, either set it in the laptop vendor's
+  tool (for example TUXEDO Control Center) or add a small systemd service that
+  writes the sysfs node on boot and after resume. Use only one of these plus the
+  extension, since they all write the same controller register.
 
 ## Screenshot Example
 

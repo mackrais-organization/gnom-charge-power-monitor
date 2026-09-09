@@ -1,11 +1,15 @@
 {
   "uuid": "charge-power-monitor@mackrais.gmail.com",
   "name": "Charge Power Monitor",
-  "description": "Shows laptop battery charge or discharge power in watts and supported peripheral battery levels in the GNOME top panel menu.",
+  "description": "Shows laptop battery charge or discharge power in watts and supported peripheral battery levels in the GNOME top panel menu. On laptops whose kernel driver exposes a charge threshold, the menu can also set the battery charge limit; applying a new limit is authenticated through pkexec.",
   "shell-version": [
     "42",
     "43",
     "44"
   ],
-  "url": "https://github.com/mackrais-organization/gnom-charge-power-monitor"
+  "url": "https://github.com/mackrais-organization/gnom-charge-power-monitor",
+  "version-name": "6",
+  "donations": {
+    "kofi": "mackrais"
+  }
 }
