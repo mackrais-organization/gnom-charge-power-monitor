@@ -21,6 +21,9 @@ The format is based on Keep a Changelog.
 - `eslint.config.js` now uses the GJS globals set and rejects `var`, loose
   equality, and deprecated `imports.byteArray` / `imports.lang` /
   `imports.mainloop`.
+- Bumped dev/CI dependencies: `eslint` 9 -> 10, `actions/checkout` 4 -> 7,
+  `softprops/action-gh-release` 2 -> 3 (all now run on the Node 24 Actions
+  runtime; CI already uses `node-version: 24`).
 
 ## [6] - 2026-09-09
 
