@@ -2,30 +2,42 @@
 
 ## Development Flow
 
-1. Create a branch for your change.
+This project uses GitHub Flow:
+
+1. Branch off `master`.
 2. Make the smallest viable change.
-3. Run local checks before opening a pull request.
-4. Open a pull request with a clear summary and testing notes.
+3. Run local checks (below) and commit.
+4. Push the branch and open a pull request with a clear summary and testing
+   notes.
+5. Merge to `master` only with CI green. `master` is the release branch;
+   releases are cut from it by tagging (see `RELEASE.md`).
 
 ## Local Checks
 
-Run the local pre-review checks:
+These mirror the CI `Review` job:
 
 ```bash
-./review-check.sh
-```
-
-Run JavaScript linting:
-
-```bash
+./review-check.sh                 # EGO-style heuristics + metadata-check.py
+python3 metadata-check.py          # metadata.json vs extensions.gnome.org rules
 npm install
-npm run lint
+npm run lint                       # ESLint with the GJS ruleset
+node --check charge-power-monitor@mackrais.gmail.com/extension.js
 ```
 
-Build the extension bundle:
+Build the extension bundle (CI `Build Bundle` job):
 
 ```bash
 ./build.sh
+```
+
+Package validation with the real GNOME tool (CI `Validate Package` job; needs
+the `gnome-extensions` CLI from `gnome-shell`):
+
+```bash
+gnome-extensions pack charge-power-monitor@mackrais.gmail.com \
+  --extra-source=icon.svg --extra-source=icon-symbolic.svg \
+  --extra-source=icon.png --extra-source=icon-symbolic.png \
+  --force --out-dir /tmp/pack
 ```
 
 Reinstall the extension locally for manual verification:
@@ -45,3 +57,5 @@ Reinstall the extension locally for manual verification:
 - Update `README.md` when behavior, scripts, compatibility, or packaging changes.
 - Do not introduce synchronous shell I/O unless there is a strong reason.
 - Prefer reviewer-friendly commits and explicit testing notes.
+- Bump `version-name` in `metadata.json` only in the PR that is meant to become
+  the next release.

@@ -4,32 +4,64 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build and publish (for example v6)'
+        required: true
+        type: string
 
 permissions:
   contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   release:
     name: Build And Publish Release
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
 
-      - name: Install JavaScript dependencies
-        run: npm install
+      - name: Verify tag matches metadata.json version-name
+        run: |
+          set -euo pipefail
+          meta="charge-power-monitor@mackrais.gmail.com/metadata.json"
+          version_name="$(python3 -c "import json; print(json.load(open('$meta')).get('version-name') or '')")"
+          if [ -z "$version_name" ]; then
+            echo "::error file=$meta::metadata.json has no version-name"
+            exit 1
+          fi
+          if [ "$RELEASE_TAG" != "v$version_name" ]; then
+            echo "::error file=$meta::Release tag '$RELEASE_TAG' does not match version-name (expected 'v$version_name')"
+            exit 1
+          fi
+          echo "Releasing $RELEASE_TAG (metadata version-name: $version_name)"
 
       - name: Install review tooling
         run: sudo apt-get update && sudo apt-get install -y ripgrep
 
       - name: Run review checks
         run: ./review-check.sh
+
+      - name: Validate metadata.json
+        run: python3 metadata-check.py
+
+      - name: Install JavaScript dependencies
+        run: npm install
 
       - name: Run JavaScript syntax check
         run: node --check charge-power-monitor@mackrais.gmail.com/extension.js
@@ -43,5 +75,8 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
           files: dist/charge-power-monitor@mackrais.gmail.com.shell-extension.zip
+          fail_on_unmatched_files: true
           generate_release_notes: true

@@ -33,16 +33,48 @@ jobs:
       - name: Run local review checks
         run: ./review-check.sh
 
+      - name: Validate metadata.json
+        run: python3 metadata-check.py
+
       - name: Run JavaScript syntax check
         run: node --check charge-power-monitor@mackrais.gmail.com/extension.js
 
       - name: Run ESLint
         run: npm run lint
 
+  validate:
+    name: Validate Package
+    runs-on: ubuntu-latest
+    needs: review
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install GNOME Shell tooling
+        run: sudo apt-get update && sudo apt-get install -y gnome-shell
+
+      - name: Show gnome-extensions version
+        run: gnome-extensions --version || true
+
+      - name: Pack extension with gnome-extensions
+        run: |
+          set -euxo pipefail
+          uuid="charge-power-monitor@mackrais.gmail.com"
+          out="$RUNNER_TEMP/pack"
+          mkdir -p "$out"
+          gnome-extensions pack "$uuid" \
+            --extra-source=icon.svg \
+            --extra-source=icon-symbolic.svg \
+            --extra-source=icon.png \
+            --extra-source=icon-symbolic.png \
+            --force --out-dir "$out"
+          unzip -l "$out/$uuid.shell-extension.zip"
+
   build:
     name: Build Bundle
     runs-on: ubuntu-latest
-    needs: review
+    needs: [review, validate]
 
     steps:
       - name: Check out repository

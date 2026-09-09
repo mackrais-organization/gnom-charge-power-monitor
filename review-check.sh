@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UUID="charge-power-monitor@mackrais.gmail.com"
 EXTENSION_JS="$ROOT_DIR/$UUID/extension.js"
+METADATA_CHECK="$ROOT_DIR/metadata-check.py"
 WARN_ONLY=0
 
 if [[ "${1:-}" == "--warn-only" ]]; then
@@ -72,6 +73,17 @@ if rg -q '_deviceItems\.push\(' "$EXTENSION_JS"; then
     }
   ' "$EXTENSION_JS" | rg -q '_clearDeviceItems\(\)'; then
     add_warning "EGO014" "objects created by extension should be destroyed in disable()" "$EXTENSION_JS:disable()"
+  fi
+fi
+
+if [[ -f "$METADATA_CHECK" ]]; then
+  if command -v python3 >/dev/null 2>&1; then
+    if ! python3 "$METADATA_CHECK" >/dev/null 2>&1; then
+      python3 "$METADATA_CHECK" || true
+      add_error "EGO001" "metadata.json failed validation (see metadata-check.py output)" "$ROOT_DIR/$UUID/metadata.json"
+    fi
+  else
+    add_warning "EGO001" "python3 not found; skipped metadata-check.py" "$METADATA_CHECK"
   fi
 fi
 
