@@ -6,7 +6,20 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
-### Added
+## [7] - 2026-09-10
+
+extensions.gnome.org rejected version 6 over the privileged command. This
+release addresses that.
+
+### Changed
+
+- The battery charge limit is now applied with a fixed, shell-free command:
+  `pkexec /usr/bin/tee -- <attribute>` with the integer on stdin, one call per
+  `charge_control_*_threshold` attribute. No `/bin/sh -c` and no string
+  interpolation into the command.
+- `execCommunicate()` accepts optional stdin.
+
+### Added (already on `master`, first released here)
 
 - `metadata-check.py`: validates `metadata.json` against extensions.gnome.org
   rules (key set, `uuid`, `shell-version`, `version-name`, `session-modes`,
@@ -15,15 +28,10 @@ The format is based on Keep a Changelog.
   `gnome-extensions pack` tool.
 - Manual `workflow_dispatch` trigger for the `Release` workflow, and a check
   that the release tag matches `metadata.json` `version-name`.
-
-### Changed
-
-- `eslint.config.js` now uses the GJS globals set and rejects `var`, loose
-  equality, and deprecated `imports.byteArray` / `imports.lang` /
-  `imports.mainloop`.
-- Bumped dev/CI dependencies: `eslint` 9 -> 10, `actions/checkout` 4 -> 7,
-  `softprops/action-gh-release` 2 -> 3 (all now run on the Node 24 Actions
-  runtime; CI already uses `node-version: 24`).
+- `eslint.config.js` GJS ruleset (rejects `var`, loose equality, deprecated
+  `imports.byteArray` / `imports.lang` / `imports.mainloop`).
+- Dev/CI dependency bumps: `eslint` 9 -> 10, `actions/checkout` 4 -> 7,
+  `softprops/action-gh-release` 2 -> 3.
 
 ## [6] - 2026-09-09
 
@@ -60,5 +68,6 @@ for this upload.
 - GNOME Shell `42`, `43`, and `44`. The codebase uses the legacy `imports.*`
   extension style and is not prepared for GNOME Shell `45+` without migration.
 
-[Unreleased]: https://github.com/mackrais-organization/gnom-charge-power-monitor/compare/v6...HEAD
+[Unreleased]: https://github.com/mackrais-organization/gnom-charge-power-monitor/compare/v7...HEAD
+[7]: https://github.com/mackrais-organization/gnom-charge-power-monitor/releases/tag/v7
 [6]: https://github.com/mackrais-organization/gnom-charge-power-monitor/releases/tag/v6
