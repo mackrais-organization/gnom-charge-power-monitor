@@ -34,25 +34,27 @@ Declared GNOME Shell support: `42`, `43`, `44`.
 
 ### Privileged action (`pkexec`)
 
-Applying a battery charge threshold writes a root-owned kernel attribute. The
-command is fixed and contains no shell:
+Applying a battery charge limit writes one root-owned kernel attribute. The
+command is a fixed array constant with no shell:
 
 ```
-pkexec /usr/bin/tee -- <attribute>
+pkexec /usr/bin/tee -- <end-threshold attribute>
 ```
 
-with the integer value passed on stdin (see `writeThresholdCommand` and
-`_applyChargeLimit` in `extension.js`).
+The integer value is passed on stdin. See `CHARGE_LIMIT_COMMAND`,
+`writeEndThresholdCommand()` and `_applyChargeLimit()` in `extension.js`.
 
-- `pkexec` runs `/usr/bin/tee` (coreutils), not a script and not anything a
-  user process can modify.
-- `<attribute>` is always one of the kernel's own `charge_control_*_threshold`
-  files under `/sys/class/power_supply/<battery>/`, discovered from the
-  `power_supply` enumeration (`CHARGE_END_THRESHOLD_FILES` /
-  `CHARGE_START_THRESHOLD_FILES`). Nothing user-supplied is interpolated.
+- `pkexec` runs `/usr/bin/tee` (coreutils) - not a script, not anything a user
+  process can modify.
+- The one argument is always the kernel's own `charge_control_end_threshold`
+  (or legacy `charge_stop_threshold`) attribute under
+  `/sys/class/power_supply/<battery>/`, taken from the `power_supply`
+  enumeration (`CHARGE_END_THRESHOLD_FILES`). Nothing user-supplied is
+  interpolated into the command.
 - The value is an integer chosen from the list the kernel publishes in
   `charge_control_end_available_thresholds` (or a fixed fallback list).
-- Runs only when the user picks a value in the menu. When start and end both
-  change, that is two `pkexec` calls (start first).
-- If the battery exposes no end-threshold attribute, the whole control is
-  replaced by a "not supported" line.
+- One `pkexec` call, so one authentication dialog. The start threshold is never
+  written - the driver keeps it below the end value on its own.
+- Runs only when the user picks a value in the menu. If the battery exposes no
+  end-threshold attribute, the whole control is replaced by a "not supported"
+  line.

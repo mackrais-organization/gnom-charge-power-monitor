@@ -37,6 +37,8 @@ const CHARGE_END_THRESHOLD_FILES = [
     'charge_control_end_threshold',
     'charge_stop_threshold',
 ];
+// Read only, for display. The extension writes the end threshold; the driver
+// moves the start threshold on its own to keep it below the end value.
 const CHARGE_START_THRESHOLD_FILES = [
     'charge_control_start_threshold',
     'charge_start_threshold',
@@ -45,13 +47,6 @@ const CHARGE_START_THRESHOLD_FILES = [
 const CHARGE_END_OPTION_FILES = [
     'charge_control_end_available_thresholds',
 ];
-const CHARGE_START_OPTION_FILES = [
-    'charge_control_start_available_thresholds',
-];
-// When the driver also supports a start threshold, keep a gap below the end
-// value so the battery is not topped up again after every small drop.
-const CHARGE_START_GAP = 10;
-const CHARGE_START_MIN = 40;
 // Fallback list for drivers that do not publish an explicit set of values.
 const CHARGE_LIMIT_FALLBACK_VALUES = [100, 90, 80, 70, 60, 50];
 // Short guidance shown next to each selectable value.
@@ -232,11 +227,9 @@ async function readChargeLimitInfo() {
     const unsupported = {
         supported: false,
         endPath: null,
-        startPath: null,
         endThreshold: null,
         startThreshold: null,
         endOptions: null,
-        startOptions: null,
         capacity: null,
     };
 
@@ -250,20 +243,15 @@ async function readChargeLimitInfo() {
 
     const startPath = await findExistingBatteryFile(batteryPath, CHARGE_START_THRESHOLD_FILES);
     const endOptionPath = await findExistingBatteryFile(batteryPath, CHARGE_END_OPTION_FILES);
-    const startOptionPath = await findExistingBatteryFile(batteryPath, CHARGE_START_OPTION_FILES);
 
     return {
         supported: true,
         endPath,
-        startPath,
         endThreshold: await readInteger(endPath),
         startThreshold: startPath === null ? null : await readInteger(startPath),
         endOptions: endOptionPath === null
             ? null
             : parseThresholdOptions(await readTrimmedFile(endOptionPath)),
-        startOptions: startOptionPath === null
-            ? null
-            : parseThresholdOptions(await readTrimmedFile(startOptionPath)),
         capacity: await readInteger(`${batteryPath}/capacity`),
     };
 }
@@ -286,50 +274,17 @@ function chargeLimitChoices(info) {
     return values;
 }
 
-// Choose a start threshold a little below the end value, snapped to a supported
-// value when the controller only accepts a fixed set.
-function pickStartThreshold(info, endValue) {
-    const target = Math.max(CHARGE_START_MIN, endValue - CHARGE_START_GAP);
-    const options = info.startOptions;
-
-    if (options === null || options.length === 0)
-        return target;
-
-    const belowTarget = options.filter(value => value <= target && value < endValue);
-    if (belowTarget.length > 0)
-        return belowTarget[belowTarget.length - 1];
-
-    const belowEnd = options.filter(value => value < endValue);
-    return belowEnd.length > 0 ? belowEnd[belowEnd.length - 1] : options[0];
-}
-
 // Fixed privileged command. No shell is involved: `pkexec` runs the coreutils
-// `tee` binary, which copies its standard input into the single file named by
-// its one argument. `attributePath` is always one of the kernel's own
-// charge_control_*_threshold attributes under
-// /sys/class/power_supply/<battery>/ (see CHARGE_*_THRESHOLD_FILES), and the
-// value written is a plain integer passed on stdin.
-const PKEXEC_PROGRAM = 'pkexec';
-const TEE_PROGRAM = '/usr/bin/tee';
+// `tee` binary, which copies its standard input into the one file it is given.
+// `endPath` is always the kernel's own charge_control_end_threshold (or the
+// legacy charge_stop_threshold) attribute under /sys/class/power_supply/<battery>/
+// (see CHARGE_END_THRESHOLD_FILES), and the value written is a plain integer
+// passed on stdin. Only the end threshold is written; the driver keeps the
+// start threshold below it on its own.
+const CHARGE_LIMIT_COMMAND = ['pkexec', '/usr/bin/tee', '--'];
 
-function writeThresholdCommand(attributePath) {
-    return [PKEXEC_PROGRAM, TEE_PROGRAM, '--', attributePath];
-}
-
-// The ordered list of {path, value} writes needed to apply an end threshold.
-// The start threshold comes first because some drivers reject an end value that
-// is not strictly above the current start value.
-function chargeThresholdWrites(info, endThreshold) {
-    const writes = [];
-
-    if (info.startPath !== null) {
-        const startThreshold = pickStartThreshold(info, endThreshold);
-        if (startThreshold !== info.startThreshold)
-            writes.push({ path: info.startPath, value: startThreshold });
-    }
-
-    writes.push({ path: info.endPath, value: endThreshold });
-    return writes;
+function writeEndThresholdCommand(endPath) {
+    return [...CHARGE_LIMIT_COMMAND, endPath];
 }
 
 function getPropertyValue(line) {
@@ -875,11 +830,13 @@ class Extension {
         this._chargeLimitBusy = true;
 
         try {
-            // Each write shows the system authentication dialog: the target
-            // attribute is root-owned. `writeThresholdCommand` is a fixed
-            // `pkexec /usr/bin/tee -- <attribute>` with the integer on stdin.
-            for (const { path, value } of chargeThresholdWrites(info, endThreshold))
-                await execCommunicate(writeThresholdCommand(path), `${value}\n`);
+            // One fixed `pkexec /usr/bin/tee -- <end attribute>` call; the
+            // system authentication dialog shows once. The value is a plain
+            // integer written on stdin.
+            await execCommunicate(
+                writeEndThresholdCommand(info.endPath),
+                `${endThreshold}\n`
+            );
         } catch (error) {
             // Authentication was dismissed or the write failed; the refresh
             // below repaints the menu with the value the battery actually has.

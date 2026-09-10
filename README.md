@@ -25,10 +25,12 @@ Many laptops (ThinkPad, some Clevo/Uniwill, ASUS, Huawei, TUXEDO, and others)
 let the kernel cap how full the battery charges. On enable, and every 30 s, the
 extension looks for a charge-threshold node on the battery:
 
-- `charge_control_end_threshold` (or the legacy `charge_stop_threshold`)
-- `charge_control_start_threshold` (or the legacy `charge_start_threshold`), when present
-- `charge_control_end_available_thresholds` / `charge_control_start_available_thresholds`,
-  when the driver publishes the exact values its controller accepts
+- `charge_control_end_threshold` (or the legacy `charge_stop_threshold`) - the
+  attribute the extension writes
+- `charge_control_start_threshold` (or the legacy `charge_start_threshold`),
+  read only, to show the resume level
+- `charge_control_end_available_thresholds`, when the driver publishes the exact
+  values its controller accepts
 
 If no end-threshold node exists, the menu shows
 `Battery charge limit: not supported by this laptop` and nothing else changes.
@@ -59,13 +61,11 @@ especially warm. Below the cap the laptop simply runs on AC power.
   fuller than the cap, so on a laptop that stays plugged in the change is not
   instant. To apply it now, run on battery until the charge drops under the
   resume level, then plug back in.
-- Applying a value writes to a root-owned kernel attribute, so it runs
-  `pkexec /usr/bin/tee -- <attribute>` (no shell) and the system authentication
-  dialog appears.
-- When a `start` threshold exists, it is set one step below the `end` value
-  (snapped to a supported value) so the battery is not topped up again after
-  every small drop. If both `start` and `end` change, that is two `pkexec`
-  prompts.
+- Applying a value writes one root-owned kernel attribute, so it runs
+  `pkexec /usr/bin/tee -- <end-threshold attribute>` (no shell) and the system
+  authentication dialog appears once.
+- Only the end threshold is written. The driver keeps the start (resume)
+  threshold below it on its own; the menu shows the resulting value.
 - The kernel does not persist thresholds across reboot on every driver. For a
   value that always survives a restart, either set it in the laptop vendor's
   tool (for example TUXEDO Control Center) or add a small systemd service that
