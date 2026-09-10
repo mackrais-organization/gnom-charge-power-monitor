@@ -76,14 +76,15 @@ const CHARGE_LIMIT_INFO =
     'level - the controller does not discharge a battery that is already ' +
     'fuller than the cap.';
 
-function execCommunicate(argv) {
-    const proc = Gio.Subprocess.new(
-        argv,
-        Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
-    );
+function execCommunicate(argv, stdin = null) {
+    let flags = Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE;
+    if (stdin !== null)
+        flags |= Gio.SubprocessFlags.STDIN_PIPE;
+
+    const proc = Gio.Subprocess.new(argv, flags);
 
     return new Promise((resolve, reject) => {
-        proc.communicate_utf8_async(null, null, (subprocess, result) => {
+        proc.communicate_utf8_async(stdin, null, (subprocess, result) => {
             try {
                 const [, stdout, stderr] = subprocess.communicate_utf8_finish(result);
                 const status = subprocess.get_exit_status();
@@ -302,17 +303,33 @@ function pickStartThreshold(info, endValue) {
     return belowEnd.length > 0 ? belowEnd[belowEnd.length - 1] : options[0];
 }
 
-function buildChargeLimitCommand(info, value) {
-    const statements = [];
+// Fixed privileged command. No shell is involved: `pkexec` runs the coreutils
+// `tee` binary, which copies its standard input into the single file named by
+// its one argument. `attributePath` is always one of the kernel's own
+// charge_control_*_threshold attributes under
+// /sys/class/power_supply/<battery>/ (see CHARGE_*_THRESHOLD_FILES), and the
+// value written is a plain integer passed on stdin.
+const PKEXEC_PROGRAM = 'pkexec';
+const TEE_PROGRAM = '/usr/bin/tee';
 
-    // Write the start threshold first: some drivers reject an end value that is
-    // not strictly above the current start value.
-    if (info.startPath !== null)
-        statements.push(`echo ${pickStartThreshold(info, value)} > "${info.startPath}"`);
+function writeThresholdCommand(attributePath) {
+    return [PKEXEC_PROGRAM, TEE_PROGRAM, '--', attributePath];
+}
 
-    statements.push(`echo ${value} > "${info.endPath}"`);
+// The ordered list of {path, value} writes needed to apply an end threshold.
+// The start threshold comes first because some drivers reject an end value that
+// is not strictly above the current start value.
+function chargeThresholdWrites(info, endThreshold) {
+    const writes = [];
 
-    return ['pkexec', '/bin/sh', '-c', statements.join(' && ')];
+    if (info.startPath !== null) {
+        const startThreshold = pickStartThreshold(info, endThreshold);
+        if (startThreshold !== info.startThreshold)
+            writes.push({ path: info.startPath, value: startThreshold });
+    }
+
+    writes.push({ path: info.endPath, value: endThreshold });
+    return writes;
 }
 
 function getPropertyValue(line) {
@@ -806,17 +823,17 @@ class Extension {
 
         submenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        for (const value of chargeLimitChoices(info)) {
-            const hint = CHARGE_LIMIT_HINTS[value];
+        for (const endThreshold of chargeLimitChoices(info)) {
+            const hint = CHARGE_LIMIT_HINTS[endThreshold];
             const label = hint === undefined
-                ? `${value}%`
-                : `${value}%  ·  ${hint}`;
+                ? `${endThreshold}%`
+                : `${endThreshold}%  ·  ${hint}`;
             const item = new PopupMenu.PopupMenuItem(label);
-            if (value === info.endThreshold)
+            if (endThreshold === info.endThreshold)
                 item.setOrnament(PopupMenu.Ornament.DOT);
 
             item.connect('activate', () => {
-                this._applyChargeLimit(info, value);
+                this._applyChargeLimit(info, endThreshold);
             });
             submenu.menu.addMenuItem(item);
         }
@@ -851,16 +868,18 @@ class Extension {
         return `Charging stops at ${info.endThreshold}%.`;
     }
 
-    async _applyChargeLimit(info, value) {
+    async _applyChargeLimit(info, endThreshold) {
         if (this._chargeLimitBusy)
             return;
 
         this._chargeLimitBusy = true;
 
         try {
-            // pkexec shows the system authentication dialog; writing the
-            // threshold needs root because the sysfs node is root-owned.
-            await execCommunicate(buildChargeLimitCommand(info, value));
+            // Each write shows the system authentication dialog: the target
+            // attribute is root-owned. `writeThresholdCommand` is a fixed
+            // `pkexec /usr/bin/tee -- <attribute>` with the integer on stdin.
+            for (const { path, value } of chargeThresholdWrites(info, endThreshold))
+                await execCommunicate(writeThresholdCommand(path), `${value}\n`);
         } catch (error) {
             // Authentication was dismissed or the write failed; the refresh
             // below repaints the menu with the value the battery actually has.

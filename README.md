@@ -59,11 +59,13 @@ especially warm. Below the cap the laptop simply runs on AC power.
   fuller than the cap, so on a laptop that stays plugged in the change is not
   instant. To apply it now, run on battery until the charge drops under the
   resume level, then plug back in.
-- Applying a value writes to a root-owned sysfs file, so the write goes through
-  `pkexec` and the system authentication dialog appears.
+- Applying a value writes to a root-owned kernel attribute, so it runs
+  `pkexec /usr/bin/tee -- <attribute>` (no shell) and the system authentication
+  dialog appears.
 - When a `start` threshold exists, it is set one step below the `end` value
   (snapped to a supported value) so the battery is not topped up again after
-  every small drop.
+  every small drop. If both `start` and `end` change, that is two `pkexec`
+  prompts.
 - The kernel does not persist thresholds across reboot on every driver. For a
   value that always survives a restart, either set it in the laptop vendor's
   tool (for example TUXEDO Control Center) or add a small systemd service that
