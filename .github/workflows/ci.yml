@@ -75,6 +75,9 @@ jobs:
             --force --out-dir "$out"
           unzip -l "$out/$uuid.shell-extension.zip"
 
+      - name: Run pinned Shexli static analysis
+        run: ./shexli-check.sh --strict
+
   build:
     name: Build Bundle
     runs-on: ubuntu-latest

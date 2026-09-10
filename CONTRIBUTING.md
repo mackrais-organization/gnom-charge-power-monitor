@@ -30,15 +30,21 @@ Build the extension bundle (CI `Build Bundle` job):
 ./build.sh
 ```
 
-Package validation with the real GNOME tool (CI `Validate Package` job; needs
-the `gnome-extensions` CLI from `gnome-shell`):
+Package validation (CI `Validate Package` job). `gnome-extensions pack` needs
+the CLI from `gnome-shell`; `shexli-check.sh` runs the extensions.gnome.org
+Shexli analyzer in the repository's pinned Docker Compose image. If Docker
+Compose is unavailable, the local script reports the check as skipped:
 
 ```bash
 gnome-extensions pack charge-power-monitor@mackrais.gmail.com \
   --extra-source=icon.svg --extra-source=icon-symbolic.svg \
   --extra-source=icon.png --extra-source=icon-symbolic.png \
   --force --out-dir /tmp/pack
+./shexli-check.sh          # add --strict to fail on error-level findings
 ```
+
+`shexli-check.sh` also runs from `build.sh` (`--strict`) and from `install.sh`
+/ `reinstall.sh`.
 
 Reinstall the extension locally for manual verification:
 

@@ -6,6 +6,13 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+
+- Pinned Docker Compose Shexli analyzer: locks `shexli` 0.2.1,
+  `tree-sitter` 0.25.0, and `tree-sitter-javascript` 0.25.0 with wheel hashes.
+  This avoids the `tree-sitter` 0.26.0 segmentation fault. It runs from
+  `shexli-check.sh`, `build.sh`, and CI's `Validate Package` job.
+
 ## [7] - 2026-09-10
 
 extensions.gnome.org rejected version 6 over the privileged command. This

@@ -14,5 +14,6 @@ rm -f "$ZIP_PATH"
   cd "$ROOT_DIR/$UUID"
   zip -qr "$ZIP_PATH" .
 )
+"$ROOT_DIR/shexli-check.sh" --strict
 
 printf 'Built: %s\n' "$ZIP_PATH"
