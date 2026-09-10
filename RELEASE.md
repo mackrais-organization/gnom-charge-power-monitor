@@ -11,8 +11,10 @@
    node --check charge-power-monitor@mackrais.gmail.com/extension.js
    ./build.sh
    ```
-2. Optional, matches the CI `Validate Package` job (needs `gnome-shell`
-   installed for the `gnome-extensions` CLI):
+2. `./build.sh` already runs `./shexli-check.sh --strict` (the
+   extensions.gnome.org Shexli analyzer, when a Python >= 3.12 one is
+   installed). Optionally also run `gnome-extensions pack`, matching the CI
+   `Validate Package` job (needs `gnome-shell`):
    ```bash
    gnome-extensions pack charge-power-monitor@mackrais.gmail.com \
      --extra-source=icon.svg --extra-source=icon-symbolic.svg \

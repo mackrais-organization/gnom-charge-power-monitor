@@ -75,6 +75,12 @@ jobs:
             --force --out-dir "$out"
           unzip -l "$out/$uuid.shell-extension.zip"
 
+      - name: Install Shexli
+        run: python3 -m pip install --user --quiet shexli || true
+
+      - name: Shexli static analysis
+        run: ./shexli-check.sh
+
   build:
     name: Build Bundle
     runs-on: ubuntu-latest

@@ -9,6 +9,9 @@ DST_DIR="$HOME/.local/share/gnome-shell/extensions/$UUID"
 "$ROOT_DIR/review-check.sh" --warn-only || true
 printf '\n'
 
+"$ROOT_DIR/shexli-check.sh" || true
+printf '\n'
+
 mkdir -p "$DST_DIR"
 cp -r "$SRC_DIR"/* "$DST_DIR"/
 gnome-extensions enable "$UUID"

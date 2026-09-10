@@ -6,6 +6,13 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+
+- `shexli-check.sh`: runs the extensions.gnome.org Shexli static analyzer on the
+  packaged extension. Best-effort - skips cleanly when no compatible Shexli is
+  installed (it needs Python >= 3.12) or when it crashes. Wired into `build.sh`
+  (`--strict`), `install.sh`, `reinstall.sh`, and the CI `Validate Package` job.
+
 ## [7] - 2026-09-10
 
 extensions.gnome.org rejected version 6 over the privileged command. This
