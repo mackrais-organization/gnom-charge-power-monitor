@@ -13,10 +13,12 @@ release addresses that.
 
 ### Changed
 
-- The battery charge limit is now applied with a fixed, shell-free command:
-  `pkexec /usr/bin/tee -- <attribute>` with the integer on stdin, one call per
-  `charge_control_*_threshold` attribute. No `/bin/sh -c` and no string
-  interpolation into the command.
+- The battery charge limit is now applied with one fixed, shell-free command:
+  `pkexec /usr/bin/tee -- <end-threshold attribute>` with the integer on stdin.
+  No `/bin/sh -c`, no string interpolation, one authentication dialog.
+- Only the end threshold is written; the driver keeps the start (resume)
+  threshold below it. The menu still reads and shows the resume level. Removes
+  `charge_control_start_threshold` writes and the start-value picker.
 - `execCommunicate()` accepts optional stdin.
 
 ### Added (already on `master`, first released here)
