@@ -1,0 +1,8 @@
+services:
+  shexli:
+    build:
+      context: tools/shexli
+    volumes:
+      - ./:/workspace:ro
+    working_dir: /workspace
+    entrypoint: ["shexli"]

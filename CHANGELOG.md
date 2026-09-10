@@ -8,10 +8,10 @@ The format is based on Keep a Changelog.
 
 ### Added
 
-- `shexli-check.sh`: runs the extensions.gnome.org Shexli static analyzer on the
-  packaged extension. Best-effort - skips cleanly when no compatible Shexli is
-  installed (it needs Python >= 3.12) or when it crashes. Wired into `build.sh`
-  (`--strict`), `install.sh`, `reinstall.sh`, and the CI `Validate Package` job.
+- Pinned Docker Compose Shexli analyzer: locks `shexli` 0.2.1,
+  `tree-sitter` 0.25.0, and `tree-sitter-javascript` 0.25.0 with wheel hashes.
+  This avoids the `tree-sitter` 0.26.0 segmentation fault. It runs from
+  `shexli-check.sh`, `build.sh`, and CI's `Validate Package` job.
 
 ## [7] - 2026-09-10
 

@@ -32,8 +32,8 @@ Build the extension bundle (CI `Build Bundle` job):
 
 Package validation (CI `Validate Package` job). `gnome-extensions pack` needs
 the CLI from `gnome-shell`; `shexli-check.sh` runs the extensions.gnome.org
-Shexli analyzer if a compatible one is installed (Python >= 3.12) and skips
-otherwise:
+Shexli analyzer in the repository's pinned Docker Compose image. If Docker
+Compose is unavailable, the local script reports the check as skipped:
 
 ```bash
 gnome-extensions pack charge-power-monitor@mackrais.gmail.com \
@@ -44,7 +44,7 @@ gnome-extensions pack charge-power-monitor@mackrais.gmail.com \
 ```
 
 `shexli-check.sh` also runs from `build.sh` (`--strict`) and from `install.sh`
-/ `reinstall.sh` (best-effort).
+/ `reinstall.sh`.
 
 Reinstall the extension locally for manual verification:
 

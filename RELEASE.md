@@ -12,8 +12,8 @@
    ./build.sh
    ```
 2. `./build.sh` already runs `./shexli-check.sh --strict` (the
-   extensions.gnome.org Shexli analyzer, when a Python >= 3.12 one is
-   installed). Optionally also run `gnome-extensions pack`, matching the CI
+   extensions.gnome.org Shexli analyzer in the pinned Docker Compose image).
+   Optionally also run `gnome-extensions pack`, matching the CI
    `Validate Package` job (needs `gnome-shell`):
    ```bash
    gnome-extensions pack charge-power-monitor@mackrais.gmail.com \
