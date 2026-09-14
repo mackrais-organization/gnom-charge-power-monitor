@@ -11,6 +11,10 @@ const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
 
 const POWER_SUPPLY_PATH = '/sys/class/power_supply';
+// Kernel power-supply directory names are always short ASCII identifiers
+// (BAT0, BAT1, ...). Anything else is rejected before it can become part of
+// a path handed to a privileged command.
+const SAFE_POWER_SUPPLY_NAME = /^[A-Za-z0-9_-]+$/;
 const BLUEZ_SERVICE = 'org.bluez';
 const BLUEZ_OBJECT_MANAGER_PATH = '/';
 const REFRESH_INTERVAL_SECONDS = 1;
@@ -139,6 +143,9 @@ async function findBatteryPath() {
                 continue;
 
             const name = info.get_name();
+            if (!SAFE_POWER_SUPPLY_NAME.test(name))
+                continue;
+
             const candidatePath = `${POWER_SUPPLY_PATH}/${name}`;
             const type = await readTrimmedFile(`${candidatePath}/type`);
 
@@ -283,7 +290,31 @@ function chargeLimitChoices(info) {
 // start threshold below it on its own.
 const CHARGE_LIMIT_COMMAND = ['pkexec', '/usr/bin/tee', '--'];
 
+// Re-validates endPath's exact shape right before it is handed to pkexec,
+// rather than trusting that it was built safely earlier. Must be
+// `/sys/class/power_supply/<safe name>/<known threshold attribute>` with no
+// extra segments, `..`, or other characters.
+function isSanitizedEndPath(endPath) {
+    if (typeof endPath !== 'string')
+        return false;
+
+    const prefix = `${POWER_SUPPLY_PATH}/`;
+    if (!endPath.startsWith(prefix))
+        return false;
+
+    const segments = endPath.slice(prefix.length).split('/');
+    if (segments.length !== 2)
+        return false;
+
+    const [batteryName, basename] = segments;
+    return SAFE_POWER_SUPPLY_NAME.test(batteryName) &&
+        CHARGE_END_THRESHOLD_FILES.includes(basename);
+}
+
 function writeEndThresholdCommand(endPath) {
+    if (!isSanitizedEndPath(endPath))
+        throw new Error(`Refusing to write unexpected charge threshold path: ${endPath}`);
+
     return [...CHARGE_LIMIT_COMMAND, endPath];
 }
 
