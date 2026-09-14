@@ -6,6 +6,20 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [8] - 2026-09-14
+
+extensions.gnome.org rejected version 7: `endPath` must be sanitized before
+being handed to `pkexec`. This release addresses that.
+
+### Changed
+
+- Explicit sanitization right before the privileged spawn: `findBatteryPath()`
+  now only accepts kernel power-supply directory names matching
+  `[A-Za-z0-9_-]+`, and a new `isSanitizedEndPath()` re-validates the full
+  `endPath` shape (`/sys/class/power_supply/<safe name>/<known threshold
+  attribute>`) immediately before `writeEndThresholdCommand()` builds the
+  `pkexec`/`tee` argv, refusing to write otherwise.
+
 ### Added
 
 - Pinned Docker Compose Shexli analyzer: locks `shexli` 0.2.1,
@@ -77,6 +91,7 @@ for this upload.
 - GNOME Shell `42`, `43`, and `44`. The codebase uses the legacy `imports.*`
   extension style and is not prepared for GNOME Shell `45+` without migration.
 
-[Unreleased]: https://github.com/mackrais-organization/gnom-charge-power-monitor/compare/v7...HEAD
+[Unreleased]: https://github.com/mackrais-organization/gnom-charge-power-monitor/compare/v8...HEAD
+[8]: https://github.com/mackrais-organization/gnom-charge-power-monitor/releases/tag/v8
 [7]: https://github.com/mackrais-organization/gnom-charge-power-monitor/releases/tag/v7
 [6]: https://github.com/mackrais-organization/gnom-charge-power-monitor/releases/tag/v6
